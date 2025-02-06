@@ -1,0 +1,41 @@
+{
+  "name": "rfz-movies",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "turbo": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier **/*.{ts,tsx} --write --config ./.prettierrc.json",
+    "analyze": "cross-env ANALYZE=true npm run build",
+    "update": "ncu -x tailwindcss --interactive --format group"
+  },
+  "dependencies": {
+    "babel-plugin-react-compiler": "^19.0.0-beta-decd7b8-20250118",
+    "cheerio": "^1.0.0",
+    "clsx": "^2.1.1",
+    "dayjs": "^1.11.13",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-icons": "^5.4.0",
+    "uninstall": "^0.0.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@next/bundle-analyzer": "^15.1.6",
+    "@total-typescript/ts-reset": "^0.6.1",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "cross-env": "^7.0.3",
+    "eslint": "^9",
+    "eslint-config-next": "15.1.6",
+    "postcss": "^8",
+    "prettier-plugin-tailwindcss": "^0.6.11",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5"
+  }
+}

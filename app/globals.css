@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .snap-x {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .snap-x::-webkit-scrollbar {
+    @apply hidden;
+  }
+}
+
+:root {
+  --background: rgb(244, 244, 245);
+  --foreground: rgb(39, 39, 42);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: rgb(39, 39, 42);
+    --foreground: rgb(244, 244, 245);
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter-sans), Helvetica, sans-serif;
+  min-width: 320px;
+  max-width: 1716px;
+}
+
+/* @supports (animation-timeline: view()) {
+  :root {
+    --snap-clip-area: 30%;
+  }
+
+  @keyframes snap-parallax-entry {
+    0% {
+      transform: translateX(calc(var(--snap-clip-area) * -1));
+      clip-path: inset(0% 0% 0% var(--snap-clip-area));
+    }
+    100% {
+      transform: translateX(0%);
+      clip-path: inset(0% 0% 0% 0%);
+    }
+  }
+
+  @keyframes snap-parallax-exit {
+    0% {
+      transform: translateX(0%);
+    }
+    100% {
+      transform: translateX(var(--snap-clip-area));
+    }
+  }
+
+  @keyframes snap-fade-in {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes snap-fade-out {
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes snap-indicator {
+    0%,
+    100% {
+      opacity: 1;
+    }
+  }
+
+  [data-snap='scope'] {
+    timeline-scope: --snap;
+  }
+
+  [data-snap='scroll'] {
+    scroll-timeline: --snap x;
+  }
+
+  [data-snap='indicator'] {
+    animation: snap-indicator linear;
+    animation-timeline: --snap;
+    animation-range: calc((var(--i) - 1) * var(--x)) calc(var(--i) * var(--x) + 1px);
+  }
+
+  [data-snap='fade'] {
+    animation:
+      snap-fade-out linear forwards,
+      snap-fade-in linear backwards;
+    animation-range: exit, entry;
+    animation-timeline: view(x);
+  }
+
+  [data-snap='parallax-entry'] {
+    animation: snap-parallax-entry linear both;
+    animation-range: entry;
+    animation-timeline: view(x);
+  }
+
+  [data-snap='parallax-exit'] {
+    animation: snap-parallax-exit linear both;
+    animation-range: exit;
+    animation-timeline: view(x);
+  }
+} */

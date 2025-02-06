@@ -1,0 +1,298 @@
+import type FetchLimiter from './limiter'
+import type {
+  Entity,
+  Genre,
+  GenreResult,
+  Search,
+  Show,
+  Shows,
+  ShowType,
+  WatchProvider,
+  WatchProviderResult,
+} from '@/types/entity'
+import { getShowDate, getShowTitle, isMovieShow, isTVShow } from '@/helpers/entity'
+import { defaultLocale, defaultRegion } from '@/config'
+import { slugify } from '@/helpers/utils'
+import { qstring } from '@/utils'
+
+const defaultParams = {
+  language: defaultLocale,
+  region: defaultRegion,
+  watch_region: defaultRegion,
+}
+
+type TMDBConstructor = {
+  maxPage: number
+  maxItem: number
+  startOnPage: number
+}
+
+type TMDBOption<T> = Partial<TMDBConstructor> & {
+  filterResults?: (items: T[]) => T[]
+  filterItem?: (item: T, lang: string) => Promise<T | null | undefined>
+  params?: Record<string, any>
+  option?: RequestInit
+  key: string
+}
+
+export default class TMDB {
+  #limiter: FetchLimiter
+
+  #shows = new Map<string, Shows>()
+  #genre = new Map<ShowType, Genre[]>()
+  #watch = new Map<ShowType, WatchProvider[]>()
+
+  #logMap = new Map<string, any>()
+  #locale = defaultParams
+
+  constructor(request: FetchLimiter) {
+    this.#limiter = request
+  }
+
+  init = async () => {
+    if (!!this.#genre.size || !!this.#watch.size) return
+
+    try {
+      const results = await Promise.allSettled([
+        this.fetch<GenreResult>('/genre/tv/list'),
+        this.fetch<GenreResult>('/genre/movie/list'),
+        this.fetch<WatchProviderResult>(qstring(`/watch/providers/tv`, this.#locale)),
+        this.fetch<WatchProviderResult>(qstring(`/watch/providers/movie`, this.#locale)),
+      ])
+
+      const [genre_tv, genre_movie, provider_tv, providers_movie] = results
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value)
+        .filter(Boolean)
+
+      if ('genres' in genre_tv) {
+        this.#genre.set('tv', genre_tv.genres)
+      }
+
+      if ('genres' in genre_movie) {
+        this.#genre.set('movie', genre_movie.genres)
+      }
+
+      if ('results' in provider_tv) {
+        this.#watch.set('tv', provider_tv.results)
+      }
+
+      if ('results' in providers_movie) {
+        this.#watch.set('movie', providers_movie.results)
+      }
+
+      this.#logMap.set('getGenresProviders', {
+        Caller: 'getGenresProviders',
+        Subcall: 4,
+        Total: 4,
+      })
+    } catch (error) {
+      console.error(`Failed to get genre/provider:`, error)
+    }
+  }
+
+  fetch = async <T>(path: string, opt?: RequestInit) => {
+    const url = `${process.env.TMDB_API_URL}${path}`
+    const options = {
+      next: { revalidate: 60 * 60 * 24 }, // 1 day
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        Authorization: `Bearer ${process.env.TMDB_API_KEY}`,
+      },
+    }
+
+    return this.#limiter.enqueue(async () => {
+      const res = await fetch(url, { ...options, ...opt })
+      const json = await res.json()
+      return json as T
+    })
+  }
+
+  query = async <T extends Entity>(url: string, options: TMDBOption<T>) => {
+    const result: T[] = []
+    const {
+      filterItem,
+      filterResults,
+      maxItem = 20,
+      maxPage = 5,
+      startOnPage = 1,
+      option,
+    } = { ...options }
+
+    let fetchedItems: T[] = []
+    let totalPages = Infinity
+    let totalFetch = 0
+    let currentPage = startOnPage
+    let withMappedItem = []
+
+    while (result.length < maxItem && currentPage <= maxPage && currentPage <= totalPages) {
+      try {
+        const path = qstring(url, {
+          ...defaultParams,
+          ...options?.params,
+          language: 'en-US',
+          page: currentPage,
+        })
+
+        const { results, total_pages } = await this.fetch<{ results: T[]; total_pages: number }>(
+          path,
+          option
+        )
+
+        totalPages = total_pages
+        currentPage++
+
+        // Deduplicate merged results
+        const merged = [
+          ...fetchedItems,
+          ...results.filter((item) => !fetchedItems.some((f) => f.id === item.id)),
+        ]
+
+        fetchedItems = filterResults?.(merged) || merged
+        withMappedItem = await Promise.allSettled(
+          fetchedItems.slice(0, maxItem - result.length).map((item) => {
+            if (filterItem) {
+              totalFetch++
+              return filterItem(item, this.#locale.language)
+            }
+            return item
+          })
+        )
+
+        withMappedItem = withMappedItem
+          .filter((result) => result.status === 'fulfilled')
+          .map((result) => result.value)
+
+        // Add only unique items to the result
+        result.push(
+          ...withMappedItem
+            .filter((item) => item && !result.some((r) => r.id === item.id))
+            .filter(Boolean)
+        )
+
+        // Remove processed items from fetchedItems
+        fetchedItems = fetchedItems.slice(withMappedItem.length)
+      } catch (error) {
+        console.error(`Failed to fetch data on page ${currentPage - 1}:`, error)
+        break // Exit if an API error occurs
+      }
+    }
+
+    if (result.every((res) => isTVShow(res) || isMovieShow(res))) {
+      this.#shows.set(options.key, result)
+    }
+
+    // Uncomment to track
+    const pages = currentPage - 1
+    const unused = !filterItem ? 0 : totalFetch - maxItem
+
+    this.#logMap.set(options.key, {
+      Caller: options.key,
+      Unused: unused,
+      Subcall: totalFetch,
+      Pages: pages,
+      Total: pages + totalFetch + unused,
+    })
+
+    return result
+  }
+
+  attributes = async (type: ShowType) => {
+    if (!this.#genre.has(type) && !this.#watch.has(type)) {
+      await this.init()
+    }
+    return { genres: this.#genre.get(type) ?? [], providers: this.#watch.get(type) || [] }
+  }
+
+  get_locale = <K extends keyof typeof defaultParams>(key: K) => defaultParams[key]
+
+  get_shows = async <T extends Shows>(key: string, instance: () => Promise<T>) => {
+    let current = this.#shows.get(key)
+    if (!current) {
+      current = await instance()
+    }
+    return current as Awaited<ReturnType<typeof instance>>
+  }
+
+  search_shows = async <T extends Show>(
+    options: { queries: string[]; type: string; params: object } & Pick<TMDBOption<T>, 'key'>
+  ) => {
+    const { queries, type, params, ...option } = options
+
+    try {
+      const searchQuery = await Promise.allSettled(
+        queries.map(async (query) => {
+          const { results } = await this.fetch<Search<T>>(
+            qstring(`/search/${type}`, {
+              query,
+              language: this.#locale.language,
+              region: this.#locale.region,
+              ...params,
+            })
+          )
+          return results.find((result) => slugify(getShowTitle(result)) === query)
+        })
+      )
+
+      const result = searchQuery
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value)
+        .filter(Boolean)
+
+      this.#logMap.set(option.key, {
+        Caller: option.key,
+        Unused: result.length - queries.length,
+        Subcall: result.length,
+        Total: queries.length,
+      })
+
+      return result
+    } catch (error) {
+      console.error(`Failed to search query:`, error)
+    }
+
+    return []
+  }
+
+  search_people = async () => {
+    //
+  }
+
+  log_trace = () => {
+    const logs = Array.from(this.#logMap.values())
+
+    console.log(`\n\rTotal: ${logs.reduce((prev, now) => prev + now.Total, 0)}`)
+    console.table(
+      logs.map((log) => ({
+        Caller: log.Caller,
+        Description: [
+          `Subcall: ${log.Subcall ?? 0}`,
+          `Unused: ${log.Unused ?? 0}`,
+          `Pages: ${log.Pages ?? 0}`,
+        ].join(', '),
+        Total: log.Total,
+      }))
+    )
+  }
+
+  log_set = (key: string, object: any) => {
+    this.#logMap.set(key, { Caller: key, ...object })
+  }
+
+  log_shows = <T extends Show>(shows: T[], col?: (show: T) => object) => {
+    console.table(
+      shows.map((show) => ({
+        id: show.id,
+        title: getShowTitle(show),
+        vote_average: show.vote_average,
+        vote_count: show.vote_count,
+        popularity: show.popularity,
+        genre_ids: show.genre_ids?.join(', '),
+        language: show.original_language,
+        releasedAt: getShowDate(show),
+        ...col?.(show),
+      }))
+    )
+  }
+}

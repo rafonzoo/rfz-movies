@@ -1,0 +1,28 @@
+import { tmdb } from '@/lib/server'
+import { NextRequest, NextResponse } from 'next/server'
+
+export function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+  const localeCookie = req.cookies.get('locale')
+
+  if (localeCookie) {
+    tmdb.setLocale(localeCookie.value)
+  }
+
+  // if (!localeCookie) {
+  //   // Get preferred language from headers
+  //   // const acceptLanguage = req.headers.get('accept-language') || 'en-US'
+  //   const acceptLanguage = 'id-ID'
+  //   const locale = acceptLanguage.split(',')[0] // Extract "en-US" part
+
+  //   // Set "locale" cookie
+  //   res.cookies.set('locale', locale, { path: '/', httpOnly: false })
+  // }
+
+  return res
+}
+
+// Apply middleware to all routes
+export const config = {
+  matcher: '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+}
