@@ -65,16 +65,17 @@ export async function getDetailedEpic(show: Show) {
     const locale = await tmdb.getLocale()
     const language = getLanguageFromShow(show, locale.language)
 
-    const [detail, images] = await Promise.all([
-      getDetail(show.id, getMediaType(show), locale.language),
-      getImages(show.id, getMediaType(show), 'null', language),
-    ])
+    // Region
+    const detail = await getDetail(show.id, getMediaType(show), locale.language)
+    if (!detail.overview) return null
 
     // Images
+    const images = await getImages(show.id, getMediaType(show), 'null', language)
     const poster_blank_path = getPosterPath(images.posters, null)
     const logo_path = getLogoPath(images.logos, language)
 
-    if (!poster_blank_path || !logo_path || !detail.overview) {
+    // if (!poster_blank_path || !logo_path || !detail.overview) {
+    if (!poster_blank_path || !logo_path) {
       return null
     }
 
@@ -88,9 +89,6 @@ export async function getDetailedEpic(show: Show) {
     const region = locale.region as 'ID'
     const watch = watches?.[region]
     const provider = watch || watches?.US
-
-    // if (!provider) return null
-
     const option = {
       overview: detail.overview || show.overview || '',
       latest_season_number: 0,
@@ -145,7 +143,7 @@ export async function getDetailedEpic(show: Show) {
   return null
 }
 
-export async function createEpicStage<T extends Promise<EpicType[]>[]>(promises: T) {
+export async function createEpicStage<T extends Promise<EpicType[]>>(...promises: T[]) {
   const shows = await Promise.allSettled(promises)
   const epicShows = shows
     .filter((shows) => shows.status === 'fulfilled')

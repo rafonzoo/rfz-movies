@@ -104,7 +104,7 @@ const EpicStage = <T extends () => Promise<EpicStageShow[]>>({
                   <p className='flex items-center'>
                     <span className='mx-1.5'>|</span>
                     <IoIosCheckmarkCircle size={16} />
-                    <span className='ml-0.5'>Bahasa</span>
+                    <span className='ml-0.5'>Subtitle</span>
                   </p>
                 )}
               </div>

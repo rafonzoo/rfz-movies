@@ -1,6 +1,6 @@
 import type FetchLimiter from './limiter'
 import type { Entity, Genre, Search, Show, Shows, ShowType, WatchProvider } from '@/types/entity'
-import { getShowTitle, isMovieShow, isTVShow } from '@/helpers/entity'
+import { getMediaType, getShowTitle, isMovieShow, isTVShow } from '@/helpers/entity'
 import { defaultLocale, defaultRegion } from '@/config'
 import { slugify } from '@/helpers/utils'
 import { qstring } from '@/utils'
@@ -14,7 +14,7 @@ type TMDBConstructor = {
 
 type TMDBOption<T> = Partial<TMDBConstructor> & {
   filterResults?: (items: T[]) => T[]
-  filterItem?: (item: T, lang: string) => Promise<T | null | undefined>
+  filterItem?: (item: T) => Promise<T | null | undefined>
   params?: Record<string, any>
   option?: RequestInit
   key: string
@@ -122,9 +122,7 @@ export default class TMDB {
 
         fetchedItems = filterResults?.(merged) || merged
         withMappedItem = await Promise.allSettled(
-          fetchedItems
-            .slice(0, maxItem - result.length)
-            .map((item) => filterItem?.(item, locale.language) ?? item)
+          fetchedItems.slice(0, maxItem - result.length).map((item) => filterItem?.(item) ?? item)
         )
 
         withMappedItem = withMappedItem
@@ -212,5 +210,19 @@ export default class TMDB {
     this.#shows.clear()
     this.#genre.clear()
     this.#watch.clear()
+  }
+
+  // Test only
+  logShows<T extends Shows>(shows: T) {
+    const reshows = shows.map((show) => ({
+      ...show,
+      title: getShowTitle(show).slice(0, 25),
+      type: getMediaType(show),
+      rating: show.vote_average,
+      vote: show.vote_count,
+      genre: show.genre_ids.join(', '),
+    }))
+
+    console.table(reshows, ['title', 'type', 'rating', 'vote', 'popularity', 'releasedAt'])
   }
 }

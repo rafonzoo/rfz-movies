@@ -28,11 +28,11 @@ export default async function RootLayout({
           <select name='locale-switcher'>
             <option value='id-ID'>Indonesia</option>
             <option value='es-ES'>Spanyol</option>
-            {/* <option value='de-DE'>Jerman</option> */}
+            <option value='de-DE'>Jerman</option>
             <option value='ko-KR'>Korea</option>
             {/* <option value='fr-FR'>Perancis</option> */}
             {/* <option value='no-NO'>Norwegia</option> */}
-            <option value='ru-RU'>Rusia</option>
+            {/* <option value='ru-RU'>Rusia</option> */}
             {/* <option value='en-AU'>Inggris (Australia)</option> */}
             {/* <option value='en-US'>Inggris (US)</option> */}
             <option value='zh-HK'>Chinese (Hongkong)</option>
